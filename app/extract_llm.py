@@ -11,6 +11,26 @@ def _signals_to_dict(s: ScrapedSignals) -> dict[str, Any]:
     return json.loads(s.model_dump_json())
 
 
+def _llm_response_has_usable_content(data: dict[str, Any]) -> bool:
+    """True when the parsed JSON includes at least one non-empty signal field."""
+    for key in (
+        "company_name",
+        "description",
+        "industry",
+        "location",
+        "funding_or_size_hint",
+    ):
+        v = data.get(key)
+        if v is not None and str(v).strip():
+            return True
+    social = data.get("social_urls")
+    if isinstance(social, dict):
+        for v in social.values():
+            if isinstance(v, str) and v.strip():
+                return True
+    return False
+
+
 def _apply_llm_dict(base: ScrapedSignals, data: dict[str, Any]) -> ScrapedSignals:
     merged = base.model_copy(deep=True)
     if data.get("company_name"):
@@ -37,9 +57,11 @@ def _apply_llm_dict(base: ScrapedSignals, data: dict[str, Any]) -> ScrapedSignal
 async def refine_with_openai(
     visible_text: str, base: ScrapedSignals
 ) -> tuple[ScrapedSignals, bool]:
-    """Return refined signals and whether the OpenAI call completed successfully.
+    """Return refined signals and whether the OpenAI call produced usable signal data.
 
-    On any failure (missing deps, API error, invalid JSON), returns ``(base, False)``.
+    Returns ``(base, False)`` when the API fails, message content is missing/empty,
+    JSON is invalid, or the parsed object has no non-empty signal fields (including
+    ``{}`` or all-null payloads).
     """
     settings = get_settings()
     if not settings.openai_api_key:
@@ -80,11 +102,17 @@ async def refine_with_openai(
             temperature=0.2,
             response_format={"type": "json_object"},
         )
-        raw = resp.choices[0].message.content or "{}"
-        data = json.loads(raw)
+        choice = resp.choices[0] if resp.choices else None
+        msg = choice.message if choice else None
+        content = getattr(msg, "content", None) if msg else None
+        if content is None or (isinstance(content, str) and not content.strip()):
+            return base, False
+        data = json.loads(content.strip())
     except Exception:
         return base, False
     if not isinstance(data, dict):
+        return base, False
+    if not _llm_response_has_usable_content(data):
         return base, False
     merged = _apply_llm_dict(base, data)
     from app.extract_heuristic import _coverage  # noqa: PLC0415

@@ -50,3 +50,76 @@ async def test_refine_with_openai_returns_true_on_success():
         assert used is True
         assert out.company_name == "Y"
         assert out.extraction_method == "hybrid"
+
+
+@pytest.mark.asyncio
+async def test_refine_with_openai_returns_false_when_message_content_empty():
+    base = ScrapedSignals(
+        company_name="Co",
+        source_url="https://example.com",
+        coverage_score=0.5,
+    )
+    mock_resp = MagicMock()
+    mock_resp.choices = [MagicMock(message=MagicMock(content=None))]
+
+    with (
+        patch("app.extract_llm.get_settings") as mock_settings,
+        patch("openai.AsyncOpenAI") as mock_client_cls,
+    ):
+        mock_settings.return_value.openai_api_key = "sk-test"
+        mock_settings.return_value.openai_model = "gpt-4o-mini"
+        mock_client_cls.return_value.chat.completions.create = AsyncMock(return_value=mock_resp)
+
+        out, used = await refine_with_openai("page text", base)
+
+        assert used is False
+        assert out.extraction_method == "heuristic"
+
+
+@pytest.mark.asyncio
+async def test_refine_with_openai_returns_false_when_json_object_empty():
+    base = ScrapedSignals(
+        company_name="Co",
+        source_url="https://example.com",
+        coverage_score=0.5,
+    )
+    mock_resp = MagicMock()
+    mock_resp.choices = [MagicMock(message=MagicMock(content="{}"))]
+
+    with (
+        patch("app.extract_llm.get_settings") as mock_settings,
+        patch("openai.AsyncOpenAI") as mock_client_cls,
+    ):
+        mock_settings.return_value.openai_api_key = "sk-test"
+        mock_settings.return_value.openai_model = "gpt-4o-mini"
+        mock_client_cls.return_value.chat.completions.create = AsyncMock(return_value=mock_resp)
+
+        out, used = await refine_with_openai("page text", base)
+
+        assert used is False
+        assert out.extraction_method == "heuristic"
+
+
+@pytest.mark.asyncio
+async def test_refine_with_openai_returns_false_when_all_nulls():
+    base = ScrapedSignals(
+        company_name="Co",
+        source_url="https://example.com",
+        coverage_score=0.5,
+    )
+    payload = '{"company_name": null, "description": null, "social_urls": {}}'
+    mock_resp = MagicMock()
+    mock_resp.choices = [MagicMock(message=MagicMock(content=payload))]
+
+    with (
+        patch("app.extract_llm.get_settings") as mock_settings,
+        patch("openai.AsyncOpenAI") as mock_client_cls,
+    ):
+        mock_settings.return_value.openai_api_key = "sk-test"
+        mock_settings.return_value.openai_model = "gpt-4o-mini"
+        mock_client_cls.return_value.chat.completions.create = AsyncMock(return_value=mock_resp)
+
+        out, used = await refine_with_openai("page text", base)
+
+        assert used is False
+        assert out.extraction_method == "heuristic"

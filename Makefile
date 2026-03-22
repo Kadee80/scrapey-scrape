@@ -1,4 +1,4 @@
-.PHONY: install backend-install frontend-install test dev-api dev-ui run
+.PHONY: install backend-install frontend-install test dev-api dev-ui run export-plan-docx
 
 install: backend-install frontend-install
 
@@ -18,3 +18,6 @@ dev-api:
 
 dev-ui:
 	cd frontend && npm run dev
+
+export-plan-docx:
+	python3 scripts/export_plan_docx.py

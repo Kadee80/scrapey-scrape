@@ -110,3 +110,24 @@ make dev-ui     # Vite dev server
 ```
 
 Ensure `.venv` was created with Python 3.10+ before `make install`.
+
+## Export `plan.md` to Google Docs
+
+There is no real “`.gdoc` file” on disk—Google Docs live in Drive. The usual workflow is to make a **Word document** and open it with Google Docs.
+
+1. Install [Pandoc](https://pandoc.org/) for best results (`brew install pandoc` on macOS). Optional fallback: `pip install python-docx` if Pandoc is missing.
+2. From the repo root:
+
+   ```bash
+   python3 scripts/export_plan_docx.py
+   ```
+
+   This reads [`plan.md`](plan.md) and writes **`CRM_Plan.docx`** in the project root.
+
+3. In [Google Drive](https://drive.google.com): **New → File upload** → choose `CRM_Plan.docx`, then **right‑click the file → Open with → Google Docs**. Drive converts it into an editable Google Doc you can rename or move.
+
+To use a different source or output path:
+
+```bash
+python3 scripts/export_plan_docx.py /path/to/plan.md /path/to/out.docx
+```
