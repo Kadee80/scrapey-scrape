@@ -34,8 +34,7 @@ async def run_preview(
     want_llm = use_llm or base.coverage_score < coverage_threshold
     if want_llm and settings.openai_api_key:
         text = trim_visible_text(fetched.html)
-        base = await refine_with_openai(text, base)
-        llm_used = True
+        base, llm_used = await refine_with_openai(text, base)
 
     return PreviewResponse(
         signals=base,

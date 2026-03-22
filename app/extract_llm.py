@@ -34,15 +34,21 @@ def _apply_llm_dict(base: ScrapedSignals, data: dict[str, Any]) -> ScrapedSignal
     return merged
 
 
-async def refine_with_openai(visible_text: str, base: ScrapedSignals) -> ScrapedSignals:
+async def refine_with_openai(
+    visible_text: str, base: ScrapedSignals
+) -> tuple[ScrapedSignals, bool]:
+    """Return refined signals and whether the OpenAI call completed successfully.
+
+    On any failure (missing deps, API error, invalid JSON), returns ``(base, False)``.
+    """
     settings = get_settings()
     if not settings.openai_api_key:
-        return base
+        return base, False
 
     try:
         from openai import AsyncOpenAI
     except ImportError:
-        return base
+        return base, False
 
     client = AsyncOpenAI(api_key=settings.openai_api_key)
     schema_hint = {
@@ -77,11 +83,11 @@ async def refine_with_openai(visible_text: str, base: ScrapedSignals) -> Scraped
         raw = resp.choices[0].message.content or "{}"
         data = json.loads(raw)
     except Exception:
-        return base
+        return base, False
     if not isinstance(data, dict):
-        return base
+        return base, False
     merged = _apply_llm_dict(base, data)
     from app.extract_heuristic import _coverage  # noqa: PLC0415
 
     merged.coverage_score = _coverage(merged)
-    return merged
+    return merged, True
